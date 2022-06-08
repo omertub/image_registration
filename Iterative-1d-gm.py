@@ -23,8 +23,6 @@ def main(argv):
     while np.abs(dx_update) >= 0.0001:
         n = min(len(x2), len(x1)) - math.ceil(np.abs(dx))  # overlap area size
 
-        # in case of negative shift - swap the signals
-        # we always move x1 to the right
         if dx < 0:
             # shift x2 right
             dx_abs = np.abs(dx)
