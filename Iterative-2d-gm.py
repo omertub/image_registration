@@ -29,30 +29,37 @@ def main(argv):
         nx = min(x1.shape[0], x2.shape[0]) - math.ceil(np.abs(dx))  # overlap area size axis x
         ny = min(x1.shape[1], x2.shape[1]) - math.ceil(np.abs(dy))  # overlap area size axis y
 
-        if dx < 0:
-            # shift x2 right
-            dx_abs = np.abs(dx)
-            dx_frac = dx_abs - math.floor(dx_abs)
-            x2s = x2[math.floor(dx_abs):]                                                      # integer part of the shift
-            x2s = np.array([(x2s[i] + (x2s[i + 1] - x2s[i]) * dx_frac) for i in range(n - 1)]) # fraction part of the shift
-            x1c = x1[0:-math.floor(dx_abs) - 1]
-        else:
-            # shift x2 left
-            dx_frac = dx - math.floor(dx)                                                      # should be negative
-            x2s = x2[:-math.floor(dx)] if math.floor(dx) > 0 else x2                           # integer part of the shift
-            x2s = np.array([(x2s[i] - (x2s[i] - x2s[i - 1]) * dx_frac) for i in range(1, n)])  # fraction part of the shift
-            x1c = x1[math.floor(dx) + 1:]
+        # Bilinear interpolation
+        dx_frac = dx - math.floor(dx)
+        dy_frac = dy - math.floor(dy)
+        x2s = x2[math.floor(dx):,:math.floor(dy)]                                           # integer part of the shift
+        for i in range(1, nx - 1):
+           for j in range(1, ny - 1):
+                x2s = np.array([(x2s[i,j] + (x2s[i + 1] - x2s[i]) * dx_frac) for i in range(nx - 1)]) # fraction part of the shift
+                x1c = x1[0:-math.floor(dx_abs) - 1]
+
 
         # build and solve linear equation
 
-        a_x, a_y = np.array([]), np.array([])
-        for y in range(ny):
-            a_x.append(np.array([(x1c[i + 1, y] - x1c[i - 1, y]) for i in range(1, n - 2)]).reshape((n - 3, 1)))
+        # TODO: maybe they are not in same size
+        nx = min(x1c.shape[0], x2s.shape[0])  # overlap area size axis x
+        ny = min(x1c.shape[1], x2s.shape[1])  # overlap area size axis y
 
-        a = np.array([(x1c[i + 1] - x1c[i - 1]) for i in range(1, n - 2)]).reshape((n - 3, 1))
-        b = np.array([(x2s[i] - x1c[i]) for i in range(1, n - 2)]).reshape((n - 3, 1))
-        dx_update = np.linalg.solve(a.T @ a, a.T @ b)[0][0]
+        a_x, a_y, b = np.array([]), np.array([]), np.array([])
+        for i in range(1, nx - 1):
+            for j in range(1, ny - 1):
+                a_x.append(x1c[i + 1, j] - x1c[i - 1, j])
+                a_y.append(x1c[i, j + 1] - x1c[i, j - 1])
+                b.append((x2s[i,j] - x1c[i,j]))
+
+        a_x = a_x.reshape((nx-3,1,3))
+        a_y = a_y.reshape((ny-3,1,3))
+        a = np.concatenate((a_x,a_y), 1)
+        
+        sol = np.linalg.solve(a.T @ a, a.T @ b)[0]
+        dx_update, dy_update = sol[0], sol[1]
         dx += dx_update
+        dy += dy_update
         # print(dx, dx_update)
 
     print("dx = %.2f" % dx, ", dy = %.2f" % dy)
