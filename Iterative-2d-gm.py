@@ -2,27 +2,32 @@
 import math
 import sys
 import numpy as np
-from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage import gaussian_filter
+
+
+def gaussian_filter2d(param, sigma):
+    pass
 
 
 def main(argv):
     # get signals to numpy array
-    # TODO: sigma=5?
-    x1 = gaussian_filter1d(np.load(argv[0])['x1'], sigma=1)
-    x2 = gaussian_filter1d(np.load(argv[1])['x2'], sigma=1)
+    x1 = gaussian_filter(np.load(argv[0])['x1'], sigma=1)
+    x2 = gaussian_filter(np.load(argv[1])['x2'], sigma=1)
 
-    # match signals length
-    if len(x1) > len(x2):
-        x1 = x1[:len(x2)]
+    # match images shapes
+    if x1.shape[0] > x2.shape[0]:
+        x1 = x1[:x2.shape[0], :x2.shape[0]]
     else:
-        x2 = x2[:len(x1)]
+        x2 = x2[:x1.shape[0], :x1.shape[0]]
 
     # update iteratively
-    dx = 0
+    dx, dy = 0, 0
     threshold = 0.0001
-    dx_update = threshold
-    while np.abs(dx_update) >= 0.0001:
-        n = min(len(x2), len(x1)) - math.ceil(np.abs(dx))  # overlap area size
+    dx_update, dy_update = threshold, threshold
+    while np.abs(dx_update) >= 0.0001 or np.abs(dy_update) >= 0.0001:
+
+        nx = min(x1.shape[0], x2.shape[0]) - math.ceil(np.abs(dx))  # overlap area size axis x
+        ny = min(x1.shape[1], x2.shape[1]) - math.ceil(np.abs(dy))  # overlap area size axis y
 
         if dx < 0:
             # shift x2 right
@@ -39,13 +44,18 @@ def main(argv):
             x1c = x1[math.floor(dx) + 1:]
 
         # build and solve linear equation
+
+        a_x, a_y = np.array([]), np.array([])
+        for y in range(ny):
+            a_x.append(np.array([(x1c[i + 1, y] - x1c[i - 1, y]) for i in range(1, n - 2)]).reshape((n - 3, 1)))
+
         a = np.array([(x1c[i + 1] - x1c[i - 1]) for i in range(1, n - 2)]).reshape((n - 3, 1))
         b = np.array([(x2s[i] - x1c[i]) for i in range(1, n - 2)]).reshape((n - 3, 1))
         dx_update = np.linalg.solve(a.T @ a, a.T @ b)[0][0]
         dx += dx_update
         # print(dx, dx_update)
 
-    print("dx = %.2f" % dx)
+    print("dx = %.2f" % dx, ", dy = %.2f" % dy)
 
 
 if __name__ == '__main__':
