@@ -47,15 +47,15 @@ def interpolation_2d(x1, x2, dx, dy):
         x1si = x1si[:, math.floor(dy_abs):]
         dir_y = 1
 
-    # # shift x2 by fraction
-    # x2s = x2si.copy()
-    # alpha = dx_abs - math.floor(dx_abs) # fraction of dx
-    # beta = dy_abs - math.floor(dy_abs)  # fraction of dy
-    # for i in range(1, nx - 1):
-    #     for j in range(1, ny - 1):
-    #         x2s[i, j] = x2si[i, j] * (1 - alpha) * (1 - beta) + x2si[i, j + dir_y] * alpha * (1 - beta) + \
-    #                     x2si[i + dir_x, j] * (1 - alpha) * beta + x2si[i + dir_x, j + dir_y] * alpha * beta
-    # x2s = x2s[1:-1, 1:-1]
+    # shift x2 by fraction
+    x2s = x2si.copy()
+    alpha = dx_abs - math.floor(dx_abs) # fraction of dx
+    beta = dy_abs - math.floor(dy_abs)  # fraction of dy
+    for i in range(1, nx - 1):
+        for j in range(1, ny - 1):
+            x2s[i, j] = x2si[i, j] * (1 - alpha) * (1 - beta) + x2si[i, j + dir_y] * alpha * (1 - beta) + \
+                        x2si[i + dir_x, j] * (1 - alpha) * beta + x2si[i + dir_x, j + dir_y] * alpha * beta
+    x2s = x2s[1:-1, 1:-1]
 
     return match_shapes(x1si, x2si)
 
@@ -86,8 +86,7 @@ def main(argv):
     dx_update, dy_update = threshold, threshold
     while np.abs(dx_update) >=threshold or np.abs(dy_update) >=threshold:
 
-        # x1c, x2s = interpolation_2d(x1, x2, dx, dy)
-        x1c, x2s = x1.copy(), x2.copy()
+        x1c, x2s = interpolation_2d(x1, x2, dx, dy)
         # print(x1c.shape, x2s.shape)
 
         # build and solve linear equation
@@ -99,8 +98,12 @@ def main(argv):
             for j in range(1, ny - 1):
                 der_x = int(x1c[i + 1, j]) - int(x1c[i - 1, j])
                 der_y = int(x1c[i, j + 1]) - int(x1c[i, j - 1])
-                a = np.append(a, [[der_x, der_y]], axis = 0)
-                b = np.append(b, int(x2s[i, j]) - int(x1c[i, j]))
+                if i==1 and j==1:
+                    a[0,0], a[0,1] = der_x, der_y
+                    b[0] = int(x2s[i, j]) - int(x1c[i, j])
+                else:
+                    a = np.append(a, [[der_x, der_y]], axis = 0)
+                    b = np.append(b, int(x2s[i, j]) - int(x1c[i, j]))
         b = b.reshape((-1, 1))
 
         sol = np.linalg.solve(a.T @ a, a.T @ b)
@@ -108,7 +111,7 @@ def main(argv):
         dx += dx_update
         dy += dy_update
 
-        print(dx_update, dy_update)
+        print(dx, dy)
 
 
     print("dx = %.2f" % dx, ", dy = %.2f" % dy)
