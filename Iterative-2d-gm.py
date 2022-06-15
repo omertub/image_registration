@@ -4,47 +4,33 @@ import sys
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-def match_shapes(x1, x2):
-    # x
-    if x1.shape[0] > x2.shape[0]:
-        x1 = x1[:x2.shape[0], :]
-    else:
-        x2 = x2[:x1.shape[0], :]
-
-    # y
-    if x1.shape[1] > x2.shape[1]:
-        x1 = x1[:, :x2.shape[1]]
-    else:
-        x2 = x2[:, :x1.shape[1]]
-
-    return x1, x2
-
 
 def interpolation_2d(x1, x2, dx, dy):
-    nx = min(x1.shape[0], x2.shape[0]) - math.ceil(np.abs(dx))  # overlap area size axis x
-    ny = min(x1.shape[1], x2.shape[1]) - math.ceil(np.abs(dy))  # overlap area size axis y
-
     dx_abs = np.abs(dx)
     dy_abs = np.abs(dy)
+
+    # TODO: remove min
+    nx = min(x1.shape[0], x2.shape[0]) - math.ceil(dx_abs)  # overlap area size axis x
+    ny = min(x1.shape[1], x2.shape[1]) - math.ceil(dy_abs)  # overlap area size axis y
 
     # shift x1/x2 left by integer
     x1si = x1.copy()
     x2si = x2.copy()
 
-    ## x direction - if dx>0 we need to shift x2, otherwise we shift x1
-    if dx > 0:
-        x2si = x2si[:-math.floor(dx), :] if math.floor(dx) > 0 else x2si
+    ## x direction - if dx<0 we need to shift x2 left, otherwise we shift x1 left
+    if dx < 0:
+        x2si = x2si[math.floor(dx_abs):, :]
         dir_x = -1
     else:
-        x1si = x1si[math.floor(dx_abs):, :]
+        x1si = x1si[math.floor(dx):, :]
         dir_x = 1
 
-    ## y direction - if dy>0 we need to shift up
-    if dy > 0:
-        x2si = x2si[:, :-math.floor(dy)]  if math.floor(dy) > 0 else x2si
+    ## y direction - if dy<0 we need to shift x2 up, otherwise we shift x1 up
+    if dy < 0:
+        x2si = x2si[:, math.floor(dy_abs):]
         dir_y = -1
     else:
-        x1si = x1si[:, math.floor(dy_abs):]
+        x1si = x1si[:, math.floor(dy):]
         dir_y = 1
 
     # shift x2 by fraction
@@ -56,8 +42,9 @@ def interpolation_2d(x1, x2, dx, dy):
             x2s[i, j] = x2si[i, j] * (1 - alpha) * (1 - beta) + x2si[i, j + dir_y] * alpha * (1 - beta) + \
                         x2si[i + dir_x, j] * (1 - alpha) * beta + x2si[i + dir_x, j + dir_y] * alpha * beta
     x2s = x2s[1:-1, 1:-1]
+    x1si = x1si[1:-1, 1:-1]
 
-    return match_shapes(x1si, x2si)
+    return x1si, x2s
 
 def main(argv):
     # get signals to numpy array
@@ -73,7 +60,7 @@ def main(argv):
     # match images shapes
     if x1.shape[0] > x2.shape[0]:
         x1 = x1[:x2.shape[0], :x2.shape[0]]
-    else:
+    elif x1.shape[0] < x2.shape[0]:
         x2 = x2[:x1.shape[0], :x1.shape[0]]
 
     # apply gaussian
@@ -82,7 +69,7 @@ def main(argv):
 
     # update iteratively
     dx, dy = 0, 0
-    threshold = 0.000001
+    threshold = 0.01
     dx_update, dy_update = threshold, threshold
     while np.abs(dx_update) >=threshold or np.abs(dy_update) >=threshold:
 
@@ -90,24 +77,24 @@ def main(argv):
         # print(x1c.shape, x2s.shape)
 
         # build and solve linear equation
-        nx = min(x1.shape[0], x2.shape[0]) - math.ceil(np.abs(dx))  # overlap area size axis x
-        ny = min(x1.shape[1], x2.shape[1]) - math.ceil(np.abs(dy))  # overlap area size axis y
+        nx = x1c.shape[0] - math.ceil(np.abs(dx))  # overlap area size axis x
+        ny = x1c.shape[1] - math.ceil(np.abs(dy))  # overlap area size axis y
 
         a, b = np.ndarray((1,2)), np.ndarray((1,1))
         for i in range(1, nx - 1):
             for j in range(1, ny - 1):
-                der_x = int(x1c[i + 1, j]) - int(x1c[i - 1, j])
-                der_y = int(x1c[i, j + 1]) - int(x1c[i, j - 1])
+                der_x = float(x1c[i + 1, j]) - float(x1c[i - 1, j])
+                der_y = float(x1c[i, j + 1]) - float(x1c[i, j - 1])
                 if i==1 and j==1:
                     a[0,0], a[0,1] = der_x, der_y
-                    b[0] = int(x2s[i, j]) - int(x1c[i, j])
+                    b[0] = float(x2s[i, j]) - float(x1c[i, j])
                 else:
                     a = np.append(a, [[der_x, der_y]], axis = 0)
-                    b = np.append(b, int(x2s[i, j]) - int(x1c[i, j]))
+                    b = np.append(b, float(x2s[i, j]) - float(x1c[i, j]))
         b = b.reshape((-1, 1))
 
         sol = np.linalg.solve(a.T @ a, a.T @ b)
-        dx_update, dy_update = sol[0, 0], sol[1, 0]
+        dx_update, dy_update = sol[0, 0], sol[1,0 ]
         dx += dx_update
         dy += dy_update
 
