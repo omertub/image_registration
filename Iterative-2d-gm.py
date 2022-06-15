@@ -20,25 +20,29 @@ def interpolation_2d(x1, x2, dx, dy):
     ## x direction - if dx<0 we need to shift x2 left, otherwise we shift x1 left
     if dx < 0:
         x2si = x2si[math.floor(dx_abs):, :]
+        x1si = x1si[:-math.floor(dx_abs), :] if math.floor(dx_abs) > 0 else x1si
         dir_x = -1
     else:
         x1si = x1si[math.floor(dx):, :]
+        x2si = x2si[:-math.floor(dx_abs), :] if math.floor(dx_abs) > 0 else x2si
         dir_x = 1
 
     ## y direction - if dy<0 we need to shift x2 up, otherwise we shift x1 up
     if dy < 0:
         x2si = x2si[:, math.floor(dy_abs):]
+        x1si = x1si[:, :-math.floor(dy_abs)] if math.floor(dy_abs) > 0 else x1si
         dir_y = -1
     else:
         x1si = x1si[:, math.floor(dy):]
+        x2si = x2si[:, :-math.floor(dy_abs)] if math.floor(dy_abs) > 0 else x2si
         dir_y = 1
 
     # shift x2 by fraction
     x2s = x2si.copy()
     alpha = dx_abs - math.floor(dx_abs) # fraction of dx
     beta = dy_abs - math.floor(dy_abs)  # fraction of dy
-    for i in range(1, nx - 1):
-        for j in range(1, ny - 1):
+    for i in range(1, x1si.shape[0] - 1):
+        for j in range(1, x1si.shape[1] - 1):
             x2s[i, j] = x2si[i, j] * (1 - alpha) * (1 - beta) + x2si[i, j + dir_y] * alpha * (1 - beta) + \
                         x2si[i + dir_x, j] * (1 - alpha) * beta + x2si[i + dir_x, j + dir_y] * alpha * beta
     x2s = x2s[1:-1, 1:-1]
@@ -64,8 +68,8 @@ def main(argv):
         x2 = x2[:x1.shape[0], :x1.shape[0]]
 
     # apply gaussian
-    x1 = gaussian_filter(x1, sigma=5)
-    x2 = gaussian_filter(x2, sigma=5)
+    x1 = gaussian_filter(x1, sigma=2)
+    x2 = gaussian_filter(x2, sigma=2)
 
     # update iteratively
     dx, dy = 0, 0
