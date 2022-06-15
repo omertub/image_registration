@@ -47,13 +47,6 @@ def main(argv):
     x1 = gaussian_filter1d(np.load(argv[0])['x1'], sigma=1)
     x2 = gaussian_filter1d(np.load(argv[1])['x2'], sigma=1)
 
-    # decimate = lambda x, d : gaussian_filter1d(x, sigma=1)[::d]
-    # x1d2 = decimate(x1, 2)
-    # x2d2 = decimate(x2, 2)
-    # dx = iterative1d(decimate(x1d2, 2), decimate(x2d2, 2), 0)
-    # dx = iterative1d(x1d2, x2d2, dx * 2)
-    # dx = iterative1d(x1, x2, dx * 2)
-
     dx = iterative1d(gaussian_filter1d(x1, sigma=1)[::4], gaussian_filter1d(x2, sigma=1)[::4], 0)
     dx = iterative1d(gaussian_filter1d(x1, sigma=1)[::2], gaussian_filter1d(x2, sigma=1)[::2], dx * 2)
     dx = iterative1d(x1, x2, dx * 2)

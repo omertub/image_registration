@@ -45,6 +45,43 @@ def interpolation_2d(x1, x2, dx, dy):
 
     return x1si, x2s
 
+
+def iterative2d(x1, x2, dx, dy):
+    dx, dy = 0, 0
+    threshold = 0.01
+    dx_update, dy_update = threshold, threshold
+    # while np.abs(dx_update) + np.abs(dy_update) >=threshold:
+    for i in range(20):
+
+        x1c, x2s = interpolation_2d(x1, x2, dx, dy)
+
+        # build and solve linear equation
+        nx = x1c.shape[0] - math.ceil(np.abs(dx))  # overlap area size axis x
+        ny = x1c.shape[1] - math.ceil(np.abs(dy))  # overlap area size axis y
+
+        a, b = np.ndarray((1,2)), np.ndarray((1,1))
+        first = 1
+        for i in range(1, nx - 1):
+            for j in range(1, ny - 1):
+                der_x = int(x1c[i + 1, j]) - int(x1c[i - 1, j])
+                der_y = int(x1c[i, j + 1]) - int(x1c[i, j - 1])
+                b_val = int(x2s[i, j]) - int(x1c[i, j])
+                if first:
+                    a[0,0], a[0,1] = der_x, der_y
+                    b[0] = b_val
+                    first = 0
+                else:
+                    a = np.append(a, [[der_x, der_y]], axis = 0)
+                    b = np.append(b, b_val)
+        b = b.reshape((-1, 1))
+
+        sol = np.linalg.solve(a.T @ a, a.T @ b)
+        dx_update, dy_update = sol[0, 0], sol[1,0]
+        dx += dx_update
+        dy += dy_update
+
+    return dx, dy
+
 def main(argv):
     # get signals to numpy array
     x1 = np.load(argv[0])['x1']
@@ -68,41 +105,13 @@ def main(argv):
         x2 = x2[:, :x1.shape[1]]
 
     # apply gaussian
-    x1 = gaussian_filter(x1, sigma=2)
-    x2 = gaussian_filter(x2, sigma=2)
+    x1 = gaussian_filter(x1, sigma=0.5)
+    x2 = gaussian_filter(x2, sigma=0.5)
 
-    # update iteratively
-    dx, dy = 0, 0
-    threshold = 0.01
-    dx_update, dy_update = threshold, threshold
-    for i in range(20):
-        x1c, x2s = interpolation_2d(x1, x2, dx, dy)
 
-        # build and solve linear equation
-        nx = x1c.shape[0] - math.ceil(np.abs(dx))  # overlap area size axis x
-        ny = x1c.shape[1] - math.ceil(np.abs(dy))  # overlap area size axis y
-
-        # least squares
-        a, b = np.ndarray((1,2)), np.ndarray((1,1))
-        first = 1
-        for i in range(1, nx - 1):
-            for j in range(1, ny - 1):
-                der_x = int(x1c[i + 1, j]) - int(x1c[i - 1, j])
-                der_y = int(x1c[i, j + 1]) - int(x1c[i, j - 1])
-                b_val = int(x2s[i, j]) - int(x1c[i, j])
-                if first:
-                    a[0,0], a[0,1] = der_x, der_y
-                    b[0] = b_val
-                    first = 0
-                else:
-                    a = np.append(a, [[der_x, der_y]], axis = 0)
-                    b = np.append(b, b_val)
-        b = b.reshape((-1, 1))
-
-        sol = np.linalg.solve(a.T @ a, a.T @ b)
-        dx_update, dy_update = sol[0, 0], sol[1,0]
-        dx += dx_update
-        dy += dy_update
+    dx, dy = iterative2d(gaussian_filter(x1, sigma=1)[::4, ::4], gaussian_filter(x2, sigma=1)[::4, ::4], 0, 0)
+    dx, dy = iterative2d(gaussian_filter(x1, sigma=1)[::2, ::2], gaussian_filter(x2, sigma=1)[::2, ::2], dx * 2, dy * 2)
+    dx, dy = iterative2d(x1, x2, dx * 2, dy * 2)
 
     print("dx = %.2f" % dx, ", dy = %.2f" % dy)
 
