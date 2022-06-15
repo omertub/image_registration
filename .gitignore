@@ -1,3 +1,7 @@
 data1dx1.npz
 data1dx2.npz
+data2dx1.npz
+data2dx2.npz
 run_prepare_hw_data.py
+im1.bmp
+im2.bmp
